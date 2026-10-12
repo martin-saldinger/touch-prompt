@@ -2,11 +2,11 @@
 
 A full-screen macOS prompt to touch your YubiKey while git signs a commit, so a missed blink doesn't fail the commit.
 
-<img src="docs/touch.gif" alt="The touch prompt: a YubiKey plugged into a MacBook Pro, its contact pulsing green, above the commit subject" width="474">
+<img src="docs/touch.png" alt="The touch prompt: a YubiKey plugged into a MacBook Pro, its contact pulsing green, above the commit subject" width="474">
 
 Missed touches are retried up to 4 times. If the key isn't found, it asks you to reconnect it.
 
-<img src="docs/reconnect.gif" alt="The reconnect prompt: a YubiKey sliding into a MacBook Pro's Thunderbolt port and lighting up" width="474">
+<img src="docs/reconnect.png" alt="The reconnect prompt: a YubiKey sliding into a MacBook Pro's Thunderbolt port and lighting up" width="474">
 
 ## Prerequisites
 

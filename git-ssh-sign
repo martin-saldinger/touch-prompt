@@ -1,23 +1,35 @@
 #!/bin/sh
 # git runs this as gpg.ssh.program. Signing with a FIDO key needs a touch,
 # so show a full-screen prompt while ssh-keygen waits and retry missed touches.
+# ssh-keygen reports "device not found" both when the key is unplugged and when
+# an interrupted signature left it stuck; replugging the key fixes both.
 
 keygen=/opt/homebrew/bin/ssh-keygen
 [ "$1" = "-Y" ] && [ "$2" = "sign" ] || exec "$keygen" "$@"
 
 prompt_bin="$(dirname "$0")/touch-prompt"
+err=$(mktemp)
+trap 'rm -f "$err"' EXIT
+trap 'kill "$prompt" 2>/dev/null; exit 1' INT TERM HUP
 attempts=4
 subtitle="git is waiting for a signature"
 attempt=1
 while :; do
   afplay /System/Library/Sounds/Glass.aiff &
-  "$prompt_bin" "$subtitle" 60 &
+  "$prompt_bin" "Touch your YubiKey" "$subtitle" 60 &
   prompt=$!
-  "$keygen" "$@"
+  "$keygen" "$@" 2>"$err"
   status=$?
   kill "$prompt" 2>/dev/null
+  cat "$err" >&2
   [ $status -eq 0 ] && exit 0
   [ $attempt -ge $attempts ] && exit $status
   attempt=$((attempt + 1))
-  subtitle="Missed it, try again ($attempt of $attempts)"
+  if grep -q "device not found" "$err"; then
+    afplay /System/Library/Sounds/Glass.aiff &
+    "$prompt_bin" "Reconnect your YubiKey" "Unplug it and plug it back in" 10
+    subtitle="git is waiting for a signature"
+  else
+    subtitle="Missed it, try again ($attempt of $attempts)"
+  fi
 done

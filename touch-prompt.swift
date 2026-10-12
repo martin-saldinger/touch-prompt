@@ -2,8 +2,9 @@ import AppKit
 import SwiftUI
 
 let args = CommandLine.arguments
-let subtitle = args.count > 1 ? args[1] : "git is waiting for a signature"
-let seconds = args.count > 2 ? Double(args[2]) ?? 30 : 30
+let title = args.count > 1 ? args[1] : "Touch your YubiKey"
+let subtitle = args.count > 2 ? args[2] : "git is waiting for a signature"
+let seconds = args.count > 3 ? Double(args[3]) ?? 30 : 30
 
 struct Ripple {
     var scale = 1.0
@@ -42,7 +43,7 @@ struct Prompt: View {
                         .symbolEffect(.pulse, options: .repeating)
                 }
                 .frame(height: 200)
-                Text("Touch your YubiKey")
+                Text(title)
                     .font(.system(size: 44, weight: .bold))
                 Text(subtitle)
                     .font(.system(size: 20))

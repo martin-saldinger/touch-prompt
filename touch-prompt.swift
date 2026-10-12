@@ -6,6 +6,9 @@ let title = args.count > 1 ? args[1] : "Touch your YubiKey"
 let subtitle = args.count > 2 ? args[2] : "git is waiting for a signature"
 let seconds = args.count > 3 ? Double(args[3]) ?? 30 : 30
 let reconnect = args.count > 4 && args[4] == "reconnect"
+let lines = subtitle.split(separator: "\n", maxSplits: 1).map(String.init)
+let status = lines.first ?? ""
+let commit = lines.count > 1 ? lines[1] : nil
 
 func hex(_ value: UInt32) -> Color {
     Color(red: Double(value >> 16 & 0xff) / 255, green: Double(value >> 8 & 0xff) / 255, blue: Double(value & 0xff) / 255)
@@ -409,12 +412,21 @@ struct Card: View {
                 .font(.system(size: 40, weight: .semibold))
                 .tracking(-0.6)
                 .foregroundStyle(Tone.text)
-            Text(subtitle)
-                .font(.system(size: 16, design: .monospaced))
-                .foregroundStyle(Tone.muted)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: 520)
+            Text(status)
+                .font(.system(size: 14, design: .monospaced))
+                .foregroundStyle(Tone.mid)
+            if let commit {
+                Text(commit)
+                    .font(.system(size: 14, design: .monospaced))
+                    .foregroundStyle(Tone.muted)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Tone.shades[2], in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Tone.faint))
+                    .frame(maxWidth: 520)
+            }
         }
         .padding(.horizontal, 64)
         .padding(.vertical, 44)

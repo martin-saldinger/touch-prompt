@@ -13,7 +13,9 @@ trap 'rm -f "$err"' EXIT
 trap 'kill "$prompt" 2>/dev/null; exit 1' INT TERM HUP
 for buffer; do :; done
 summary=$(awk 'NR == 1 && !/^tree / { exit } !body && /^$/ { body = 1; next } body { print; exit }' "$buffer")
-waiting=${summary:-git is waiting for a signature}
+nl='
+'
+waiting="git is waiting for a signature${summary:+$nl$summary}"
 attempts=4
 subtitle=$waiting
 attempt=1
@@ -33,6 +35,6 @@ while :; do
     "$prompt_bin" "Reconnect your YubiKey" "Unplug it and plug it back in" 10 reconnect
     subtitle=$waiting
   else
-    subtitle="Missed it, try again ($attempt of $attempts)${summary:+: $summary}"
+    subtitle="Missed it, try again ($attempt of $attempts)${summary:+$nl$summary}"
   fi
 done

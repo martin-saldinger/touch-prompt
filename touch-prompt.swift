@@ -5,8 +5,13 @@ let args = CommandLine.arguments
 let subtitle = args.count > 1 ? args[1] : "git is waiting for a signature"
 let seconds = args.count > 2 ? Double(args[2]) ?? 30 : 30
 
+struct Ripple {
+    var scale = 1.0
+    var opacity = 0.0
+}
+
 struct Prompt: View {
-    @State private var pulse = false
+    @State private var breathe = false
 
     var body: some View {
         ZStack {
@@ -16,12 +21,21 @@ struct Prompt: View {
                     Circle()
                         .fill(Color.green.opacity(0.18))
                         .frame(width: 140, height: 140)
-                        .scaleEffect(pulse ? 1.2 : 0.85)
+                        .scaleEffect(breathe ? 1.15 : 0.9)
                     Circle()
                         .strokeBorder(Color.green.opacity(0.5), lineWidth: 2)
                         .frame(width: 140, height: 140)
-                        .scaleEffect(pulse ? 1.45 : 1)
-                        .opacity(pulse ? 0 : 1)
+                        .keyframeAnimator(initialValue: Ripple(), repeating: true) { ring, ripple in
+                            ring.scaleEffect(ripple.scale).opacity(ripple.opacity)
+                        } keyframes: { _ in
+                            KeyframeTrack(\.scale) {
+                                CubicKeyframe(1.5, duration: 1.4)
+                            }
+                            KeyframeTrack(\.opacity) {
+                                CubicKeyframe(1, duration: 0.3)
+                                CubicKeyframe(0, duration: 1.1)
+                            }
+                        }
                     Image(systemName: "key.horizontal.fill")
                         .font(.system(size: 60, weight: .semibold))
                         .foregroundStyle(.green)
@@ -41,7 +55,7 @@ struct Prompt: View {
         }
         .environment(\.colorScheme, .dark)
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: false)) { pulse = true }
+            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { breathe = true }
         }
     }
 }

@@ -11,8 +11,11 @@ prompt_bin="$(dirname "$0")/touch-prompt"
 err=$(mktemp)
 trap 'rm -f "$err"' EXIT
 trap 'kill "$prompt" 2>/dev/null; exit 1' INT TERM HUP
+for buffer; do :; done
+summary=$(awk 'NR == 1 && !/^tree / { exit } !body && /^$/ { body = 1; next } body { print; exit }' "$buffer")
+waiting=${summary:-git is waiting for a signature}
 attempts=4
-subtitle="git is waiting for a signature"
+subtitle=$waiting
 attempt=1
 while :; do
   afplay /System/Library/Sounds/Glass.aiff &
@@ -27,9 +30,9 @@ while :; do
   attempt=$((attempt + 1))
   if grep -q "device not found" "$err"; then
     afplay /System/Library/Sounds/Glass.aiff &
-    "$prompt_bin" "Reconnect your YubiKey" "Unplug it and plug it back in" 10
-    subtitle="git is waiting for a signature"
+    "$prompt_bin" "Reconnect your YubiKey" "Unplug it and plug it back in" 10 reconnect
+    subtitle=$waiting
   else
-    subtitle="Missed it, try again ($attempt of $attempts)"
+    subtitle="Missed it, try again ($attempt of $attempts)${summary:+: $summary}"
   fi
 done

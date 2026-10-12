@@ -2,11 +2,13 @@
 
 When git signs a commit with a YubiKey or another FIDO security key, the key blinks and waits a few seconds for a touch. If you miss the blink, the signature times out and the commit fails. This happens often when a coding agent runs `git commit` for you.
 
-touch-prompt dims every screen and shows "Touch your YubiKey" while git waits for the touch. It closes as soon as the signature is done. If you miss the touch, it tries again, up to 4 times. It also plays a chime, which you only hear when the Mac isn't muted.
+touch-prompt dims every screen and shows "Touch your YubiKey" with the subject of the commit being signed, over an isometric drawing of a YubiKey plugged into a MacBook Pro. It closes as soon as the signature is done. If you miss the touch, it tries again, up to 4 times. It also plays a chime, which you only hear when the Mac isn't muted.
 
 If ssh-keygen can't find the key, touch-prompt shows "Reconnect your YubiKey" for 10 seconds before the next attempt. This happens when the key is unplugged, and also when a cancelled signature (for example, Ctrl+C during a commit) leaves the key stuck. Unplugging the key and plugging it back in fixes both.
 
 Clicks pass through the overlay, and it closes on its own after 60 seconds.
+
+The drawing uses the dark palette of the [Anatomy figures](https://skills.wheresryan.sh/anatomy).
 
 ## Prerequisites
 

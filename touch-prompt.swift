@@ -2,12 +2,11 @@ import AppKit
 import SwiftUI
 
 let args = CommandLine.arguments
-let title = args.count > 1 ? args[1] : "Touch your YubiKey"
-let subtitle = args.count > 2 ? args[2] : "git is waiting for a signature"
-let seconds = args.count > 3 ? Double(args[3]) ?? 30 : 30
+let title = args[1]
+let lines = args[2].split(separator: "\n", maxSplits: 1).map(String.init)
+let seconds = Double(args[3])!
 let reconnect = args.count > 4 && args[4] == "reconnect"
-let lines = subtitle.split(separator: "\n", maxSplits: 1).map(String.init)
-let status = lines.first ?? ""
+let status = lines[0]
 let commit = lines.count > 1 ? lines[1] : nil
 
 func hex(_ value: UInt32) -> Color {
@@ -30,16 +29,6 @@ enum Tone {
     static let gold = hex(0xdbab45)
     static let text = hex(0xe6e6e6)
     static let muted = hex(0xa3a3a3)
-}
-
-struct YubiKeyBody: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = UnevenRoundedRectangle(
-            topLeadingRadius: 30, bottomLeadingRadius: 30, bottomTrailingRadius: 6, topTrailingRadius: 6
-        ).path(in: rect)
-        path.addEllipse(in: CGRect(x: rect.minX + 13, y: rect.midY - 8, width: 16, height: 16))
-        return path
-    }
 }
 
 enum Iso {
@@ -184,7 +173,12 @@ struct Figure {
     static let top: CGFloat = 24
     static let contact = CGPoint(x: bodyLength / 2 + 14, y: 0)
 
-    let bodyFace = YubiKeyBody().path(in: CGRect(x: 0, y: -36, width: bodyLength, height: 72))
+    let bodyFace: Path = {
+        var path = UnevenRoundedRectangle(topLeadingRadius: 30, bottomLeadingRadius: 30, bottomTrailingRadius: 6, topTrailingRadius: 6)
+            .path(in: CGRect(x: 0, y: -36, width: bodyLength, height: 72))
+        path.addEllipse(in: CGRect(x: 13, y: -8, width: 16, height: 16))
+        return path
+    }()
     let base = Path(roundedRect: CGRect(x: port, y: -139, width: width, height: 420), cornerRadius: 30)
     let lidSolid: Path
     let lidFace: Path
@@ -257,14 +251,14 @@ struct Figure {
         others.addPath(Path(ellipseIn: CGRect(x: 116, y: center - 6.5, width: 13, height: 13)).applying(side))
         otherPorts = others
         portDetails = Path { path in
-            for center in [0, 45] as [CGFloat] {
-                path.addRoundedRect(in: CGRect(x: center - 11, y: Self.thickness / 2 - 1.5, width: 22, height: 3), cornerSize: CGSize(width: 1.5, height: 1.5))
+            for port in [0, 45] as [CGFloat] {
+                path.addRoundedRect(in: CGRect(x: port - 11, y: center - 1.5, width: 22, height: 3), cornerSize: CGSize(width: 1.5, height: 1.5))
             }
-            path.addRoundedRect(in: CGRect(x: -80, y: Self.thickness / 2 - 3, width: 50, height: 6), cornerSize: CGSize(width: 3, height: 3))
+            path.addRoundedRect(in: CGRect(x: -80, y: center - 3, width: 50, height: 6), cornerSize: CGSize(width: 3, height: 3))
             for pin in 0..<5 {
-                path.addEllipse(in: CGRect(x: -64 + CGFloat(pin) * 4.5, y: Self.thickness / 2 - 1, width: 2, height: 2))
+                path.addEllipse(in: CGRect(x: -64 + CGFloat(pin) * 4.5, y: center - 1, width: 2, height: 2))
             }
-            path.addEllipse(in: CGRect(x: 119.5, y: Self.thickness / 2 - 3, width: 6, height: 6))
+            path.addEllipse(in: CGRect(x: 119.5, y: center - 3, width: 6, height: 6))
         }.applying(side)
 
         let key = bodyFace.applying(Iso.top(Self.thickness)).boundingRect
@@ -400,14 +394,11 @@ struct ReconnectAnimation: View {
 struct Card: View {
     var body: some View {
         VStack(spacing: 18) {
-            Group {
-                if reconnect {
-                    ReconnectAnimation()
-                } else {
-                    TouchAnimation()
-                }
+            if reconnect {
+                ReconnectAnimation()
+            } else {
+                TouchAnimation()
             }
-            .frame(height: 220)
             Text(title)
                 .font(.system(size: 40, weight: .semibold))
                 .tracking(-0.6)

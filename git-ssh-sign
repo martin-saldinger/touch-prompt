@@ -1,0 +1,23 @@
+#!/bin/sh
+# git runs this as gpg.ssh.program. Signing with a FIDO key needs a touch,
+# so show a full-screen prompt while ssh-keygen waits and retry missed touches.
+
+keygen=/opt/homebrew/bin/ssh-keygen
+[ "$1" = "-Y" ] && [ "$2" = "sign" ] || exec "$keygen" "$@"
+
+prompt_bin="$(dirname "$0")/touch-prompt"
+attempts=4
+subtitle="git is waiting for a signature"
+attempt=1
+while :; do
+  afplay /System/Library/Sounds/Glass.aiff &
+  "$prompt_bin" "$subtitle" 60 &
+  prompt=$!
+  "$keygen" "$@"
+  status=$?
+  kill "$prompt" 2>/dev/null
+  [ $status -eq 0 ] && exit 0
+  [ $attempt -ge $attempts ] && exit $status
+  attempt=$((attempt + 1))
+  subtitle="Missed it, try again ($attempt of $attempts)"
+done

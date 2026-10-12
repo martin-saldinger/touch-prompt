@@ -1,0 +1,81 @@
+import AppKit
+import SwiftUI
+
+let args = CommandLine.arguments
+let subtitle = args.count > 1 ? args[1] : "git is waiting for a signature"
+let seconds = args.count > 2 ? Double(args[2]) ?? 30 : 30
+
+struct Prompt: View {
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.6)
+            VStack(spacing: 22) {
+                ZStack {
+                    Circle()
+                        .fill(Color.green.opacity(0.18))
+                        .frame(width: 140, height: 140)
+                        .scaleEffect(pulse ? 1.2 : 0.85)
+                    Circle()
+                        .strokeBorder(Color.green.opacity(0.5), lineWidth: 2)
+                        .frame(width: 140, height: 140)
+                        .scaleEffect(pulse ? 1.45 : 1)
+                        .opacity(pulse ? 0 : 1)
+                    Image(systemName: "key.horizontal.fill")
+                        .font(.system(size: 60, weight: .semibold))
+                        .foregroundStyle(.green)
+                        .symbolEffect(.pulse, options: .repeating)
+                }
+                .frame(height: 200)
+                Text("Touch your YubiKey")
+                    .font(.system(size: 44, weight: .bold))
+                Text(subtitle)
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 72)
+            .padding(.vertical, 48)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 36, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 36, style: .continuous).strokeBorder(.white.opacity(0.12)))
+        }
+        .environment(\.colorScheme, .dark)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: false)) { pulse = true }
+        }
+    }
+}
+
+let app = NSApplication.shared
+app.setActivationPolicy(.accessory)
+
+let panels = NSScreen.screens.map { screen in
+    let panel = NSPanel(
+        contentRect: screen.frame,
+        styleMask: [.borderless, .nonactivatingPanel],
+        backing: .buffered,
+        defer: false
+    )
+    panel.isOpaque = false
+    panel.backgroundColor = .clear
+    panel.level = .screenSaver
+    panel.ignoresMouseEvents = true
+    panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+    panel.contentView = NSHostingView(rootView: Prompt())
+    panel.setFrame(screen.frame, display: true)
+    panel.alphaValue = 0
+    panel.orderFrontRegardless()
+    return panel
+}
+NSAnimationContext.runAnimationGroup { context in
+    context.duration = 0.25
+    panels.forEach { $0.animator().alphaValue = 1 }
+}
+
+signal(SIGTERM, SIG_IGN)
+let term = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+term.setEventHandler { app.terminate(nil) }
+term.resume()
+
+DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { app.terminate(nil) }
+app.run()

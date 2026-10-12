@@ -16,7 +16,16 @@ Missed touches are retried up to 4 times. If the key isn't found, it asks you to
 
 ## Install
 
-Run `./install.sh`. It builds into `~/.local/bin` and sets `gpg.ssh.program` in your global git config.
+In Claude Code:
+
+```
+/plugin install touch-prompt --marketplace martin-saldinger/touch-prompt
+/touch-prompt:install
+```
+
+The plugin also tells Claude to run signed commits itself and wait for your touch.
+
+Without Claude Code, clone this repo and run `./install.sh`. It builds into `~/.local/bin` and sets `gpg.ssh.program` in your global git config.
 
 ## Uninstall
 

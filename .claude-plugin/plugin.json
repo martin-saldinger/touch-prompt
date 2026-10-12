@@ -1,0 +1,9 @@
+{
+  "name": "touch-prompt",
+  "version": "0.1.0",
+  "description": "Full-screen macOS prompt to touch your YubiKey while git signs a commit, so Claude can run signed commits itself.",
+  "author": { "name": "Martin Saldinger" },
+  "repository": "https://github.com/martin-saldinger/touch-prompt",
+  "license": "MIT",
+  "keywords": ["git", "yubikey", "signing", "macos"]
+}

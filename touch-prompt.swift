@@ -74,17 +74,16 @@ func loops(_ path: Path) -> [[CGPoint]] {
         case .quadCurve(let to, let control):
             for step in 1...8 {
                 let t = CGFloat(step) / 8, u = 1 - t
-                add(CGPoint(
-                    x: u * u * last.x + 2 * u * t * control.x + t * t * to.x,
-                    y: u * u * last.y + 2 * u * t * control.y + t * t * to.y
-                ))
+                let (a, b, c) = (u * u, 2 * u * t, t * t)
+                add(CGPoint(x: a * last.x + b * control.x + c * to.x, y: a * last.y + b * control.y + c * to.y))
             }
         case .curve(let to, let control1, let control2):
             for step in 1...8 {
                 let t = CGFloat(step) / 8, u = 1 - t
+                let (a, b, c, d) = (u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t)
                 add(CGPoint(
-                    x: u * u * u * last.x + 3 * u * u * t * control1.x + 3 * u * t * t * control2.x + t * t * t * to.x,
-                    y: u * u * u * last.y + 3 * u * u * t * control1.y + 3 * u * t * t * control2.y + t * t * t * to.y
+                    x: a * last.x + b * control1.x + c * control2.x + d * to.x,
+                    y: a * last.y + b * control1.y + c * control2.y + d * to.y
                 ))
             }
         case .closeSubpath:

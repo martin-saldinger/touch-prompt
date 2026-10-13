@@ -28,11 +28,21 @@ jobs:
           git -C "$sample" -c user.name=sample -c user.email=sample@example.com commit -q --allow-empty -m "Add a preview mode to git-ssh-sign"
           mkdir -p docs/screenshots
           page=docs/screenshots.md
-          printf '# Screenshots\n\n`.github/workflows/screenshots.yml` regenerates this page with `git-ssh-sign --preview` on every pull request.\n' > "$page"
+          shot() {
+            git -C "$sample" config touch-prompt.style "$1"
+            (cd "$sample" && "$GITHUB_WORKSPACE/git-ssh-sign" --preview "$2" "$GITHUB_WORKSPACE/docs/screenshots/$3.png")
+          }
+          printf '# Screenshots\n\n`.github/workflows/screenshots.yml` regenerates this page with `git-ssh-sign --preview` on every pull request.\n\n## Prompts\n' > "$page"
           for mode in touch missed reconnect; do
-            (cd "$sample" && "$GITHUB_WORKSPACE/git-ssh-sign" --preview "$mode" "$GITHUB_WORKSPACE/docs/screenshots/$mode.png")
-            printf '\n## `--preview %s`\n\n![The %s prompt](screenshots/%s.png)\n' "$mode" "$mode" "$mode" >> "$page"
+            shot card "$mode" "$mode"
+            printf '\n### `--preview %s`\n\n![The %s prompt](screenshots/%s.png)\n' "$mode" "$mode" "$mode" >> "$page"
           done
+          printf '\n## Styles\n\nEach shows `--preview touch` with `touch-prompt.style` set. The `menubar` image is drawn for this page; the real one is a system menu bar item.\n' >> "$page"
+          for style in fullscreen card hud menubar; do
+            shot "$style" touch "style-$style"
+            printf '\n### `%s`\n\n![The %s style](screenshots/style-%s.png)\n' "$style" "$style" "$style" >> "$page"
+          done
+          printf '\n### `none`\n\nPlays only the sound.\n' >> "$page"
       - name: Commit changed screenshots
         # Fork PRs get a read-only token, so they render but can't push.
         if: github.event.pull_request.head.repo.full_name == github.repository

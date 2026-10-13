@@ -512,23 +512,56 @@ struct Hud: View {
 }
 
 struct Prompt: View {
+    var time: Double?
+
     var body: some View {
         ZStack {
             Color.black.opacity(style == .fullscreen ? 0.55 : 0)
-            Card()
+            Card(time: time)
         }
     }
 }
 
+// Drawn only for screenshots. The live item is an NSStatusItem that pulses on the same timeline.
+struct MenuBarItem: View {
+    static let timeline = KeyframeTimeline(initialValue: 1.0) {
+        KeyframeTrack {
+            LinearKeyframe(0.35, duration: 0.7, timingCurve: .easeInOut)
+            LinearKeyframe(1, duration: 0.7, timingCurve: .easeInOut)
+        }
+    }
+    var time: Double
+
+    var body: some View {
+        Label(title, systemImage: "key.fill")
+            .font(.system(size: 13))
+            .foregroundStyle(.white)
+            .opacity(Self.timeline.value(time: time))
+            .padding(.horizontal, 12)
+            .frame(height: 24)
+            .background(.black.opacity(0.8))
+    }
+}
+
 if frames {
+    if style == .none {
+        FileHandle.standardError.write(Data("touch-prompt: style \"none\" has nothing to render\n".utf8))
+        exit(1)
+    }
     MainActor.assumeIsolated {
-        let duration = reconnect ? ReconnectAnimation.timeline.duration : TouchAnimation.timeline.duration
+        let duration = style == .menubar ? MenuBarItem.timeline.duration
+            : reconnect ? ReconnectAnimation.timeline.duration : TouchAnimation.timeline.duration
         for frame in 0..<Int((duration * 25).rounded()) {
             let time = Double(frame) / 25
             let view = Group {
-                if style == .hud { Hud(time: time) } else { Card(time: time) }
+                switch style {
+                case .fullscreen: Prompt(time: time).frame(width: 1000, height: 700)
+                case .card, .none: Card(time: time).padding(48)
+                case .hud: Hud(time: time).padding(48)
+                case .menubar: MenuBarItem(time: time).padding(48)
+                }
             }
-            let renderer = ImageRenderer(content: view.padding(48).environment(\.colorScheme, .dark))
+            let renderer = ImageRenderer(content: view.environment(\.colorScheme, .dark))
             renderer.scale = 2
             FileHandle.standardOutput.write(NSBitmapImageRep(cgImage: renderer.cgImage!).representation(using: .png, properties: [:])!)
         }
@@ -571,13 +604,10 @@ case .menubar:
     item.button?.image = NSImage(systemSymbolName: "key.fill", accessibilityDescription: nil)
     item.button?.imagePosition = .imageLeading
     item.button?.title = title
-    var dim = false
-    Timer.scheduledTimer(withTimeInterval: 0.7, repeats: true) { _ in
-        dim.toggle()
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.6
-            item.button?.animator().alphaValue = dim ? 0.35 : 1
-        }
+    let start = Date()
+    Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { _ in
+        let time = Date().timeIntervalSince(start).truncatingRemainder(dividingBy: MenuBarItem.timeline.duration)
+        item.button?.alphaValue = MenuBarItem.timeline.value(time: time)
     }
     statusItem = item
 case .none:

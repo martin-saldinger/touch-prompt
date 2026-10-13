@@ -14,11 +14,12 @@ keygen=/opt/homebrew/bin/ssh-keygen
 attempts=$(git config --type=int touch-prompt.attempts || echo 4)
 key=$(git config touch-prompt.keyName || echo YubiKey)
 sound=$(git config touch-prompt.sound || echo Glass)
+style=$(git config touch-prompt.style || echo fullscreen)
 case $sound in */*) ;; off) sound= ;; *) sound=/System/Library/Sounds/$sound.aiff ;; esac
 
 # prompt execs, so $! is the prompt itself. Run it in the background, a
 # pipeline, a subshell, or last.
-prompt() { exec "$(dirname "$0")/touch-prompt" --key "$key" "$@"; }
+prompt() { exec "$(dirname "$0")/touch-prompt" --key "$key" --style "$style" "$@"; }
 chime() { [ -n "$sound" ] && afplay "$sound" & }
 
 if [ "$1" = "--preview" ]; then

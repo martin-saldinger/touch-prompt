@@ -12,6 +12,16 @@ while let arg = rest.popFirst() {
         options[arg] = value
     }
 }
+enum Style: String {
+    case fullscreen, card, hud, menubar, none
+}
+
+let style = options["--style"].map { name in
+    Style(rawValue: name) ?? {
+        FileHandle.standardError.write(Data("touch-prompt: unknown style \"\(name)\", using fullscreen\n".utf8))
+        return .fullscreen
+    }()
+} ?? .fullscreen
 let reconnect = flags.contains("--reconnect")
 let frames = flags.contains("--frames")
 let seconds = options["--seconds"].flatMap(Double.init) ?? 60
@@ -338,8 +348,8 @@ struct Figure {
 }
 
 extension View {
-    func figureFade() -> some View {
-        frame(width: 440, height: 220)
+    func figureFade(width: CGFloat) -> some View {
+        frame(width: width, height: width / 2)
             .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.25)], startPoint: .top, endPoint: .bottom))
             .mask(LinearGradient(stops: [.init(color: .black, location: 0.6), .init(color: .clear, location: 1)], startPoint: .leading, endPoint: .trailing))
     }
@@ -374,10 +384,9 @@ struct TouchAnimation: View {
 
     var body: some View {
         if let time {
-            canvas(Self.timeline.value(time: time)).figureFade()
+            canvas(Self.timeline.value(time: time))
         } else {
             KeyframeAnimator(initialValue: Pulse(), repeating: true, content: canvas) { _ in pulse() }
-                .figureFade()
         }
     }
 }
@@ -417,10 +426,21 @@ struct ReconnectAnimation: View {
 
     var body: some View {
         if let time {
-            canvas(Self.timeline.value(time: time)).figureFade()
+            canvas(Self.timeline.value(time: time))
         } else {
             KeyframeAnimator(initialValue: Plug(), repeating: true, content: canvas) { _ in plug() }
-                .figureFade()
+        }
+    }
+}
+
+struct Animation: View {
+    var time: Double?
+
+    var body: some View {
+        if reconnect {
+            ReconnectAnimation(time: time)
+        } else {
+            TouchAnimation(time: time)
         }
     }
 }
@@ -430,11 +450,7 @@ struct Card: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            if reconnect {
-                ReconnectAnimation(time: time)
-            } else {
-                TouchAnimation(time: time)
-            }
+            Animation(time: time).figureFade(width: 440)
             Text(title)
                 .font(.system(size: 40, weight: .semibold))
                 .tracking(-0.6)
@@ -466,13 +482,41 @@ struct Card: View {
     }
 }
 
+struct Hud: View {
+    var time: Double?
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Animation(time: time).figureFade(width: 160)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Tone.text)
+                Text(status)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(Tone.mid)
+                if let commit {
+                    Text(commit)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(Tone.muted)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
+            .frame(width: 250, alignment: .leading)
+        }
+        .padding(16)
+        .background(Tone.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Tone.faint))
+    }
+}
+
 struct Prompt: View {
     var body: some View {
         ZStack {
-            Color.black.opacity(0.55)
+            Color.black.opacity(style == .fullscreen ? 0.55 : 0)
             Card()
         }
-        .environment(\.colorScheme, .dark)
     }
 }
 
@@ -480,8 +524,11 @@ if frames {
     MainActor.assumeIsolated {
         let duration = reconnect ? ReconnectAnimation.timeline.duration : TouchAnimation.timeline.duration
         for frame in 0..<Int((duration * 25).rounded()) {
-            let card = Card(time: Double(frame) / 25).padding(48).environment(\.colorScheme, .dark)
-            let renderer = ImageRenderer(content: card)
+            let time = Double(frame) / 25
+            let view = Group {
+                if style == .hud { Hud(time: time) } else { Card(time: time) }
+            }
+            let renderer = ImageRenderer(content: view.padding(48).environment(\.colorScheme, .dark))
             renderer.scale = 2
             FileHandle.standardOutput.write(NSBitmapImageRep(cgImage: renderer.cgImage!).representation(using: .png, properties: [:])!)
         }
@@ -492,23 +539,49 @@ if frames {
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 
-let panels = NSScreen.screens.map { screen in
-    let panel = NSPanel(
-        contentRect: screen.frame,
-        styleMask: [.borderless, .nonactivatingPanel],
-        backing: .buffered,
-        defer: false
-    )
+func panel(_ frame: NSRect, _ view: some View) -> NSPanel {
+    let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
     panel.isOpaque = false
     panel.backgroundColor = .clear
+    panel.hasShadow = false
     panel.level = .screenSaver
     panel.ignoresMouseEvents = true
     panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-    panel.contentView = NSHostingView(rootView: Prompt())
-    panel.setFrame(screen.frame, display: true)
+    panel.contentView = NSHostingView(rootView: view.environment(\.colorScheme, .dark))
+    panel.setFrame(frame, display: true)
     panel.alphaValue = 0
     panel.orderFrontRegardless()
     return panel
+}
+
+var panels: [NSPanel] = []
+var statusItem: NSStatusItem?
+switch style {
+case .fullscreen, .card:
+    panels = NSScreen.screens.map { panel($0.frame, Prompt()) }
+case .hud:
+    if let screen = NSScreen.main {
+        let size = NSHostingView(rootView: Hud()).fittingSize
+        let corner = NSPoint(x: screen.visibleFrame.maxX - size.width - 16, y: screen.visibleFrame.maxY - size.height - 16)
+        panels = [panel(NSRect(origin: corner, size: size), Hud())]
+        panels[0].hasShadow = true
+    }
+case .menubar:
+    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    item.button?.image = NSImage(systemSymbolName: "key.fill", accessibilityDescription: nil)
+    item.button?.imagePosition = .imageLeading
+    item.button?.title = title
+    var dim = false
+    Timer.scheduledTimer(withTimeInterval: 0.7, repeats: true) { _ in
+        dim.toggle()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.6
+            item.button?.animator().alphaValue = dim ? 0.35 : 1
+        }
+    }
+    statusItem = item
+case .none:
+    break
 }
 NSAnimationContext.runAnimationGroup { context in
     context.duration = 0.25

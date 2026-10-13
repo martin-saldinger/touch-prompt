@@ -18,7 +18,7 @@
 
 ## Styles
 
-Each shows `--preview touch` with `touch-prompt.style` set. The `menubar` image is drawn for this page; the real one is a system menu bar item.
+Each shows `--preview touch` with `touch-prompt.style` set.
 
 ### `fullscreen`
 
@@ -31,10 +31,6 @@ Each shows `--preview touch` with `touch-prompt.style` set. The `menubar` image 
 ### `hud`
 
 ![The hud style](screenshots/style-hud.png)
-
-### `menubar`
-
-![The menubar style](screenshots/style-menubar.png)
 
 ### `none`
 

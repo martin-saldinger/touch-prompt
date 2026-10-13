@@ -1,7 +1,9 @@
 import AppKit
 import SwiftUI
 
-let args = CommandLine.arguments
+var args = CommandLine.arguments
+let output = args.count > 2 && args[1] == "--render" ? args[2] : nil
+if output != nil { args.removeSubrange(1...2) }
 let title = args[1]
 let lines = args[2].split(separator: "\n", maxSplits: 1).map(String.init)
 let seconds = Double(args[3])!
@@ -341,11 +343,23 @@ struct Pulse {
 struct TouchAnimation: View {
     let figure = Figure()
 
+    func canvas(_ pulse: Pulse) -> some View {
+        Canvas { context, size in
+            figure.draw(context, size: size, x: Figure.travel, lit: pulse.lit, ring: pulse.ring)
+        }
+    }
+
     var body: some View {
+        if output != nil {
+            canvas(Pulse(lit: 1, ring: 0.3)).figureFade()
+        } else {
+            animated
+        }
+    }
+
+    var animated: some View {
         KeyframeAnimator(initialValue: Pulse(), repeating: true) { pulse in
-            Canvas { context, size in
-                figure.draw(context, size: size, x: Figure.travel, lit: pulse.lit, ring: pulse.ring)
-            }
+            canvas(pulse)
         } keyframes: { _ in
             KeyframeTrack(\.lit) {
                 LinearKeyframe(1, duration: 0.3, timingCurve: .easeInOut)
@@ -367,11 +381,23 @@ struct Plug {
 struct ReconnectAnimation: View {
     let figure = Figure()
 
+    func canvas(_ plug: Plug) -> some View {
+        Canvas { context, size in
+            figure.draw(context, size: size, x: plug.x, lit: plug.lit)
+        }
+    }
+
     var body: some View {
+        if output != nil {
+            canvas(Plug(x: Figure.travel / 2)).figureFade()
+        } else {
+            animated
+        }
+    }
+
+    var animated: some View {
         KeyframeAnimator(initialValue: Plug(), repeating: true) { plug in
-            Canvas { context, size in
-                figure.draw(context, size: size, x: plug.x, lit: plug.lit)
-            }
+            canvas(plug)
         } keyframes: { _ in
             KeyframeTrack(\.x) {
                 LinearKeyframe(0, duration: 0.4)
@@ -438,6 +464,16 @@ struct Prompt: View {
         }
         .environment(\.colorScheme, .dark)
     }
+}
+
+if let output {
+    MainActor.assumeIsolated {
+        let renderer = ImageRenderer(content: Card().padding(48).environment(\.colorScheme, .dark))
+        renderer.scale = 2
+        let png = NSBitmapImageRep(cgImage: renderer.cgImage!).representation(using: .png, properties: [:])!
+        try! png.write(to: URL(fileURLWithPath: output))
+    }
+    exit(0)
 }
 
 let app = NSApplication.shared

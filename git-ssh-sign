@@ -3,7 +3,8 @@
 # so show a full-screen prompt while ssh-keygen waits and retry missed touches.
 # ssh-keygen reports "device not found" both when the key is unplugged and when
 # an interrupted signature left it stuck; replugging the key fixes both.
-# Run it with --preview [touch|missed|reconnect] to see a prompt without signing.
+# Run it with --preview [touch|missed|reconnect] to see a prompt without signing,
+# or add a file path to save the prompt as a PNG instead.
 
 keygen=/opt/homebrew/bin/ssh-keygen
 prompt_bin="$(dirname "$0")/touch-prompt"
@@ -16,12 +17,14 @@ missed() { echo "Missed it, try again ($1 of $attempts)${summary:+$nl$summary}";
 
 if [ "$1" = "--preview" ]; then
   summary=$(git log -1 --format=%s 2>/dev/null)
+  out=$3
   case ${2:-touch} in
     touch) set -- "Touch your YubiKey" "$(waiting)" 6 ;;
     missed) set -- "Touch your YubiKey" "$(missed 2)" 6 ;;
     reconnect) set -- "Reconnect your YubiKey" "Unplug it and plug it back in" 6 reconnect ;;
-    *) echo "usage: $0 --preview [touch|missed|reconnect]" >&2; exit 2 ;;
+    *) echo "usage: $0 --preview [touch|missed|reconnect] [file.png]" >&2; exit 2 ;;
   esac
+  [ -n "$out" ] && exec "$prompt_bin" --render "$out" "$@"
   afplay "$sound" &
   exec "$prompt_bin" "$@"
 fi

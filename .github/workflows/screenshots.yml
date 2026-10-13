@@ -2,21 +2,41 @@ name: Screenshots
 
 on: pull_request
 
+# Two runs on one branch would race to push; keep only the latest.
+concurrency:
+  group: screenshots-${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
   screenshots:
     runs-on: macos-14
-    strategy:
-      matrix:
-        mode: [touch, missed, reconnect]
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          # The prompt shows the last commit subject; use the PR's, not the merge commit's.
-          ref: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.head_ref }}
       - run: swiftc -O touch-prompt.swift -o touch-prompt
-      - run: ./git-ssh-sign --preview ${{ matrix.mode }} ${{ matrix.mode }}.png
-      # Unzipped artifacts hold one file each and open in the browser.
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          path: ${{ matrix.mode }}.png
-          archive: false
+      - name: Render docs/screenshots.md
+        run: |
+          # The prompt shows the last commit subject. Render from a scratch repo
+          # so it's fixed and the images only change when the prompt does.
+          sample=$(mktemp -d)
+          git -C "$sample" init -q
+          git -C "$sample" -c user.name=sample -c user.email=sample@example.com commit -q --allow-empty -m "Add a preview mode to git-ssh-sign"
+          mkdir -p docs/screenshots
+          page=docs/screenshots.md
+          printf '# Screenshots\n\n`.github/workflows/screenshots.yml` regenerates this page with `git-ssh-sign --preview` on every pull request.\n' > "$page"
+          for mode in touch missed reconnect; do
+            (cd "$sample" && "$GITHUB_WORKSPACE/git-ssh-sign" --preview "$mode" "$GITHUB_WORKSPACE/docs/screenshots/$mode.png")
+            printf '\n## `--preview %s`\n\n![The %s prompt](screenshots/%s.png)\n' "$mode" "$mode" "$mode" >> "$page"
+          done
+      - name: Commit changed screenshots
+        # Fork PRs get a read-only token, so they render but can't push.
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git add docs/screenshots.md docs/screenshots
+          git diff --cached --quiet && exit 0
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Update screenshots"
+          git push -q

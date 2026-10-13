@@ -1,23 +1,27 @@
 import AppKit
 import SwiftUI
 
-// git-ssh-sign passes --title, --status, --commit, --seconds, --reconnect, and --frames.
+// git-ssh-sign passes --key, --commit, --missed, --seconds, --reconnect, and --frames.
+// Empty values count as unset.
 var options: [String: String] = [:]
 var flags: Set<String> = []
 var rest = CommandLine.arguments.dropFirst()
 while let arg = rest.popFirst() {
     if arg == "--reconnect" || arg == "--frames" {
         flags.insert(arg)
-    } else {
-        options[arg] = rest.popFirst()
+    } else if let value = rest.popFirst(), !value.isEmpty {
+        options[arg] = value
     }
 }
-let title = options["--title", default: ""]
-let status = options["--status", default: ""]
-let commit = options["--commit"].flatMap { $0.isEmpty ? nil : $0 }
-let seconds = options["--seconds"].flatMap(Double.init) ?? 60
 let reconnect = flags.contains("--reconnect")
 let frames = flags.contains("--frames")
+let seconds = options["--seconds"].flatMap(Double.init) ?? 60
+let key = options["--key", default: "YubiKey"]
+let commit = options["--commit"]
+let title = reconnect ? "Reconnect your \(key)" : "Touch your \(key)"
+let status = reconnect
+    ? "Unplug it and plug it back in"
+    : options["--missed"].map { "Missed it, try again (\($0))" } ?? "git is waiting for a signature"
 
 func hex(_ value: UInt32) -> Color {
     Color(red: Double(value >> 16 & 0xff) / 255, green: Double(value >> 8 & 0xff) / 255, blue: Double(value & 0xff) / 255)

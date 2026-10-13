@@ -1,71 +1,64 @@
 #!/bin/sh
-# git runs this as gpg.ssh.program. Signing with a FIDO key needs a touch,
-# so show a full-screen prompt while ssh-keygen waits and retry missed touches.
-# ssh-keygen reports "device not found" both when the key is unplugged and when
-# an interrupted signature left it stuck; replugging the key fixes both.
-# Run it with --preview [touch|missed|reconnect] to see a prompt without signing,
-# or add a file path to save it as an animated PNG instead (needs ffmpeg).
-# Settings come from git config under touch-prompt.*; see the README.
+# git runs this as gpg.ssh.program. Signing with a FIDO key needs a touch, so
+# show a prompt while ssh-keygen waits and retry missed touches. ssh-keygen
+# reports "device not found" both when the key is unplugged and when an
+# interrupted signature left it stuck; replugging the key fixes both.
+#
+# --preview [touch|missed|reconnect] [file.png] shows a prompt without signing,
+# or saves it as an animated PNG (needs ffmpeg). Settings are in the README.
 
 keygen=/opt/homebrew/bin/ssh-keygen
-prompt_bin="$(dirname "$0")/touch-prompt"
-# Verification and everything else go straight to ssh-keygen, before any setup.
+# Verification and everything else go straight to ssh-keygen.
 [ "$1" = "-Y" ] && [ "$2" = "sign" ] || [ "$1" = "--preview" ] || exec "$keygen" "$@"
 
 # git prints its own error for an invalid value, then the default applies.
 attempts=$(git config --type=int touch-prompt.attempts || echo 4)
 key=$(git config touch-prompt.keyName || echo YubiKey)
 sound=$(git config touch-prompt.sound || echo Glass)
-case $sound in
-  off) sound= ;;
-  */*) ;;
-  *) sound=/System/Library/Sounds/$sound.aiff ;;
-esac
+case $sound in */*) ;; off) sound= ;; *) sound=/System/Library/Sounds/$sound.aiff ;; esac
 
+# prompt execs, so $! is the prompt itself. Run it in the background, a
+# pipeline, a subshell, or last.
+prompt() { exec "$(dirname "$0")/touch-prompt" --key "$key" "$@"; }
 chime() { [ -n "$sound" ] && afplay "$sound" & }
-waiting="git is waiting for a signature"
-missed() { echo "Missed it, try again ($1 of $attempts)"; }
 
 if [ "$1" = "--preview" ]; then
-  summary=$(git log -1 --format=%s 2>/dev/null)
   out=$3
+  summary=$(git log -1 --format=%s 2>/dev/null)
   case ${2:-touch} in
-    touch) set -- --title "Touch your $key" --status "$waiting" --commit "$summary" ;;
-    missed) set -- --title "Touch your $key" --status "$(missed 2)" --commit "$summary" ;;
-    reconnect) set -- --title "Reconnect your $key" --status "Unplug it and plug it back in" --reconnect ;;
+    touch) set -- --commit "$summary" ;;
+    missed) set -- --commit "$summary" --missed "2 of $attempts" ;;
+    reconnect) set -- --reconnect ;;
     *) echo "usage: $0 --preview [touch|missed|reconnect] [file.png]" >&2; exit 2 ;;
   esac
-  if [ -n "$out" ]; then
-    "$prompt_bin" --frames "$@" | ffmpeg -v error -y -f png_pipe -framerate 25 -i - -plays 0 -f apng "$out"
-    exit
-  fi
-  chime
-  exec "$prompt_bin" --seconds 6 "$@"
+  [ -z "$out" ] && chime && prompt --seconds 6 "$@"
+  prompt --frames "$@" | ffmpeg -v error -y -f png_pipe -framerate 25 -i - -plays 0 -f apng "$out"
+  exit
 fi
 
 err=$(mktemp)
 trap 'rm -f "$err"' EXIT
-trap 'kill "$prompt" 2>/dev/null; exit 1' INT TERM HUP
+trap 'kill "$pid" 2>/dev/null; exit 1' INT TERM HUP
+# The last argument is the file to sign. For a commit, show its subject.
 for buffer; do :; done
 summary=$(awk 'NR == 1 && !/^tree / { exit } !body && /^$/ { body = 1; next } body { print; exit }' "$buffer")
-message=$waiting
+missed=
 attempt=1
 while :; do
   chime
-  "$prompt_bin" --title "Touch your $key" --status "$message" --commit "$summary" &
-  prompt=$!
+  prompt --commit "$summary" --missed "$missed" &
+  pid=$!
   "$keygen" "$@" 2>"$err"
   status=$?
-  kill "$prompt" 2>/dev/null
+  kill "$pid" 2>/dev/null
   cat "$err" >&2
   [ $status -eq 0 ] && exit 0
   [ $attempt -ge $attempts ] && exit $status
   attempt=$((attempt + 1))
+  missed="$attempt of $attempts"
   if grep -q "device not found" "$err"; then
     chime
-    "$prompt_bin" --title "Reconnect your $key" --status "Unplug it and plug it back in" --seconds 10 --reconnect
-    message=$waiting
-  else
-    message=$(missed $attempt)
+    (prompt --reconnect --seconds 10)
+    missed=
   fi
 done

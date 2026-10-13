@@ -18,6 +18,7 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.head_ref }}
       - run: swiftc -O touch-prompt.swift -o touch-prompt
+      - run: command -v ffmpeg || brew install ffmpeg
       - name: Render docs/screenshots.md
         run: |
           # The prompt shows the last commit subject. Render from a scratch repo

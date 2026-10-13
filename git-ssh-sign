@@ -4,7 +4,7 @@
 # ssh-keygen reports "device not found" both when the key is unplugged and when
 # an interrupted signature left it stuck; replugging the key fixes both.
 # Run it with --preview [touch|missed|reconnect] to see a prompt without signing,
-# or add a file path to save the prompt as a PNG instead.
+# or add a file path to save it as an animated PNG instead (needs ffmpeg).
 
 keygen=/opt/homebrew/bin/ssh-keygen
 prompt_bin="$(dirname "$0")/touch-prompt"
@@ -24,7 +24,10 @@ if [ "$1" = "--preview" ]; then
     reconnect) set -- "Reconnect your YubiKey" "Unplug it and plug it back in" 6 reconnect ;;
     *) echo "usage: $0 --preview [touch|missed|reconnect] [file.png]" >&2; exit 2 ;;
   esac
-  [ -n "$out" ] && exec "$prompt_bin" --render "$out" "$@"
+  if [ -n "$out" ]; then
+    "$prompt_bin" --frames "$@" | ffmpeg -v error -y -f png_pipe -framerate 25 -i - -plays 0 -f apng "$out"
+    exit
+  fi
   afplay "$sound" &
   exec "$prompt_bin" "$@"
 fi

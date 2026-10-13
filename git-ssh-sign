@@ -5,45 +5,54 @@
 # an interrupted signature left it stuck; replugging the key fixes both.
 # Run it with --preview [touch|missed|reconnect] to see a prompt without signing,
 # or add a file path to save it as an animated PNG instead (needs ffmpeg).
+# Settings come from git config under touch-prompt.*; see the README.
 
 keygen=/opt/homebrew/bin/ssh-keygen
 prompt_bin="$(dirname "$0")/touch-prompt"
-sound=/System/Library/Sounds/Glass.aiff
-attempts=4
-nl='
-'
-waiting() { echo "git is waiting for a signature${summary:+$nl$summary}"; }
-missed() { echo "Missed it, try again ($1 of $attempts)${summary:+$nl$summary}"; }
+# Verification and everything else go straight to ssh-keygen, before any setup.
+[ "$1" = "-Y" ] && [ "$2" = "sign" ] || [ "$1" = "--preview" ] || exec "$keygen" "$@"
+
+# git prints its own error for an invalid value, then the default applies.
+attempts=$(git config --type=int touch-prompt.attempts || echo 4)
+key=$(git config touch-prompt.keyName || echo YubiKey)
+sound=$(git config touch-prompt.sound || echo Glass)
+case $sound in
+  off) sound= ;;
+  */*) ;;
+  *) sound=/System/Library/Sounds/$sound.aiff ;;
+esac
+
+chime() { [ -n "$sound" ] && afplay "$sound" & }
+waiting="git is waiting for a signature"
+missed() { echo "Missed it, try again ($1 of $attempts)"; }
 
 if [ "$1" = "--preview" ]; then
   summary=$(git log -1 --format=%s 2>/dev/null)
   out=$3
   case ${2:-touch} in
-    touch) set -- "Touch your YubiKey" "$(waiting)" 6 ;;
-    missed) set -- "Touch your YubiKey" "$(missed 2)" 6 ;;
-    reconnect) set -- "Reconnect your YubiKey" "Unplug it and plug it back in" 6 reconnect ;;
+    touch) set -- --title "Touch your $key" --status "$waiting" --commit "$summary" ;;
+    missed) set -- --title "Touch your $key" --status "$(missed 2)" --commit "$summary" ;;
+    reconnect) set -- --title "Reconnect your $key" --status "Unplug it and plug it back in" --reconnect ;;
     *) echo "usage: $0 --preview [touch|missed|reconnect] [file.png]" >&2; exit 2 ;;
   esac
   if [ -n "$out" ]; then
     "$prompt_bin" --frames "$@" | ffmpeg -v error -y -f png_pipe -framerate 25 -i - -plays 0 -f apng "$out"
     exit
   fi
-  afplay "$sound" &
-  exec "$prompt_bin" "$@"
+  chime
+  exec "$prompt_bin" --seconds 6 "$@"
 fi
-
-[ "$1" = "-Y" ] && [ "$2" = "sign" ] || exec "$keygen" "$@"
 
 err=$(mktemp)
 trap 'rm -f "$err"' EXIT
 trap 'kill "$prompt" 2>/dev/null; exit 1' INT TERM HUP
 for buffer; do :; done
 summary=$(awk 'NR == 1 && !/^tree / { exit } !body && /^$/ { body = 1; next } body { print; exit }' "$buffer")
-subtitle=$(waiting)
+message=$waiting
 attempt=1
 while :; do
-  afplay "$sound" &
-  "$prompt_bin" "Touch your YubiKey" "$subtitle" 60 &
+  chime
+  "$prompt_bin" --title "Touch your $key" --status "$message" --commit "$summary" &
   prompt=$!
   "$keygen" "$@" 2>"$err"
   status=$?
@@ -53,10 +62,10 @@ while :; do
   [ $attempt -ge $attempts ] && exit $status
   attempt=$((attempt + 1))
   if grep -q "device not found" "$err"; then
-    afplay "$sound" &
-    "$prompt_bin" "Reconnect your YubiKey" "Unplug it and plug it back in" 10 reconnect
-    subtitle=$(waiting)
+    chime
+    "$prompt_bin" --title "Reconnect your $key" --status "Unplug it and plug it back in" --seconds 10 --reconnect
+    message=$waiting
   else
-    subtitle=$(missed $attempt)
+    message=$(missed $attempt)
   fi
 done

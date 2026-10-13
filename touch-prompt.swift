@@ -1,15 +1,23 @@
 import AppKit
 import SwiftUI
 
-var args = CommandLine.arguments
-let frames = args.count > 1 && args[1] == "--frames"
-if frames { args.remove(at: 1) }
-let title = args[1]
-let lines = args[2].split(separator: "\n", maxSplits: 1).map(String.init)
-let seconds = Double(args[3])!
-let reconnect = args.count > 4 && args[4] == "reconnect"
-let status = lines[0]
-let commit = lines.count > 1 ? lines[1] : nil
+// git-ssh-sign passes --title, --status, --commit, --seconds, --reconnect, and --frames.
+var options: [String: String] = [:]
+var flags: Set<String> = []
+var rest = CommandLine.arguments.dropFirst()
+while let arg = rest.popFirst() {
+    if arg == "--reconnect" || arg == "--frames" {
+        flags.insert(arg)
+    } else {
+        options[arg] = rest.popFirst()
+    }
+}
+let title = options["--title", default: ""]
+let status = options["--status", default: ""]
+let commit = options["--commit"].flatMap { $0.isEmpty ? nil : $0 }
+let seconds = options["--seconds"].flatMap(Double.init) ?? 60
+let reconnect = flags.contains("--reconnect")
+let frames = flags.contains("--frames")
 
 func hex(_ value: UInt32) -> Color {
     Color(red: Double(value >> 16 & 0xff) / 255, green: Double(value >> 8 & 0xff) / 255, blue: Double(value & 0xff) / 255)

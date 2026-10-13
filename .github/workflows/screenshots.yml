@@ -5,27 +5,18 @@ on: pull_request
 jobs:
   screenshots:
     runs-on: macos-14
+    strategy:
+      matrix:
+        mode: [touch, missed, reconnect]
     steps:
       - uses: actions/checkout@v4
         with:
           # The prompt shows the last commit subject; use the PR's, not the merge commit's.
           ref: ${{ github.event.pull_request.head.sha }}
       - run: swiftc -O touch-prompt.swift -o touch-prompt
-      - run: |
-          mkdir screenshots
-          for mode in touch missed reconnect; do
-            ./git-ssh-sign --preview "$mode" "screenshots/$mode.png"
-          done
+      - run: ./git-ssh-sign --preview ${{ matrix.mode }} ${{ matrix.mode }}.png
       # Unzipped artifacts hold one file each and open in the browser.
       - uses: actions/upload-artifact@v7
         with:
-          path: screenshots/touch.png
-          archive: false
-      - uses: actions/upload-artifact@v7
-        with:
-          path: screenshots/missed.png
-          archive: false
-      - uses: actions/upload-artifact@v7
-        with:
-          path: screenshots/reconnect.png
+          path: ${{ matrix.mode }}.png
           archive: false

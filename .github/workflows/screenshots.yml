@@ -16,7 +16,16 @@ jobs:
           for mode in touch missed reconnect; do
             ./git-ssh-sign --preview "$mode" "screenshots/$mode.png"
           done
-      - uses: actions/upload-artifact@v4
+      # Unzipped artifacts hold one file each and open in the browser.
+      - uses: actions/upload-artifact@v7
         with:
-          name: screenshots
-          path: screenshots
+          path: screenshots/touch.png
+          archive: false
+      - uses: actions/upload-artifact@v7
+        with:
+          path: screenshots/missed.png
+          archive: false
+      - uses: actions/upload-artifact@v7
+        with:
+          path: screenshots/reconnect.png
+          archive: false

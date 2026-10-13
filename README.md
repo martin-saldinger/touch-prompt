@@ -27,7 +27,7 @@ The plugin also tells Claude to run signed commits itself and wait for your touc
 
 Without Claude Code, clone this repo and run `./install.sh`. It builds into `~/.local/bin` and sets `gpg.ssh.program` in your global git config.
 
-To see a prompt without signing anything, run `~/.local/bin/git-ssh-sign --preview` with `touch`, `missed`, or `reconnect`. It defaults to `touch` and closes after 6 seconds.
+To see a prompt without signing anything, run `~/.local/bin/git-ssh-sign --preview` with `touch`, `missed`, or `reconnect`. It defaults to `touch` and closes after 6 seconds. Add a file path after the mode to save it as an animated PNG instead, which needs ffmpeg (`brew install ffmpeg`). CI does this for every pull request and commits the results to [docs/screenshots.md](docs/screenshots.md).
 
 ## Uninstall
 

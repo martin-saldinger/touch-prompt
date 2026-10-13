@@ -1,7 +1,9 @@
 import AppKit
 import SwiftUI
 
-let args = CommandLine.arguments
+var args = CommandLine.arguments
+let frames = args.count > 1 && args[1] == "--frames"
+if frames { args.remove(at: 1) }
 let title = args[1]
 let lines = args[2].split(separator: "\n", maxSplits: 1).map(String.init)
 let seconds = Double(args[3])!
@@ -72,17 +74,16 @@ func loops(_ path: Path) -> [[CGPoint]] {
         case .quadCurve(let to, let control):
             for step in 1...8 {
                 let t = CGFloat(step) / 8, u = 1 - t
-                add(CGPoint(
-                    x: u * u * last.x + 2 * u * t * control.x + t * t * to.x,
-                    y: u * u * last.y + 2 * u * t * control.y + t * t * to.y
-                ))
+                let (a, b, c) = (u * u, 2 * u * t, t * t)
+                add(CGPoint(x: a * last.x + b * control.x + c * to.x, y: a * last.y + b * control.y + c * to.y))
             }
         case .curve(let to, let control1, let control2):
             for step in 1...8 {
                 let t = CGFloat(step) / 8, u = 1 - t
+                let (a, b, c, d) = (u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t)
                 add(CGPoint(
-                    x: u * u * u * last.x + 3 * u * u * t * control1.x + 3 * u * t * t * control2.x + t * t * t * to.x,
-                    y: u * u * u * last.y + 3 * u * u * t * control1.y + 3 * u * t * t * control2.y + t * t * t * to.y
+                    x: a * last.x + b * control1.x + c * control2.x + d * to.x,
+                    y: a * last.y + b * control1.y + c * control2.y + d * to.y
                 ))
             }
         case .closeSubpath:
@@ -338,24 +339,35 @@ struct Pulse {
     var ring = 0.0
 }
 
+@KeyframesBuilder<Pulse>
+func pulse() -> some Keyframes<Pulse> {
+    KeyframeTrack(\.lit) {
+        LinearKeyframe(1, duration: 0.3, timingCurve: .easeInOut)
+        LinearKeyframe(0, duration: 1.1, timingCurve: .easeInOut)
+    }
+    KeyframeTrack(\.ring) {
+        LinearKeyframe(1, duration: 1.4, timingCurve: .easeOut)
+    }
+}
+
 struct TouchAnimation: View {
+    static let timeline = KeyframeTimeline(initialValue: Pulse(), content: pulse)
+    var time: Double?
     let figure = Figure()
 
-    var body: some View {
-        KeyframeAnimator(initialValue: Pulse(), repeating: true) { pulse in
-            Canvas { context, size in
-                figure.draw(context, size: size, x: Figure.travel, lit: pulse.lit, ring: pulse.ring)
-            }
-        } keyframes: { _ in
-            KeyframeTrack(\.lit) {
-                LinearKeyframe(1, duration: 0.3, timingCurve: .easeInOut)
-                LinearKeyframe(0, duration: 1.1, timingCurve: .easeInOut)
-            }
-            KeyframeTrack(\.ring) {
-                LinearKeyframe(1, duration: 1.4, timingCurve: .easeOut)
-            }
+    func canvas(_ pulse: Pulse) -> some View {
+        Canvas { context, size in
+            figure.draw(context, size: size, x: Figure.travel, lit: pulse.lit, ring: pulse.ring)
         }
-        .figureFade()
+    }
+
+    var body: some View {
+        if let time {
+            canvas(Self.timeline.value(time: time)).figureFade()
+        } else {
+            KeyframeAnimator(initialValue: Pulse(), repeating: true, content: canvas) { _ in pulse() }
+                .figureFade()
+        }
     }
 }
 
@@ -364,40 +376,53 @@ struct Plug {
     var lit = 0.0
 }
 
+@KeyframesBuilder<Plug>
+func plug() -> some Keyframes<Plug> {
+    KeyframeTrack(\.x) {
+        LinearKeyframe(0, duration: 0.4)
+        LinearKeyframe(Figure.travel, duration: 0.9, timingCurve: .easeInOut)
+        LinearKeyframe(Figure.travel, duration: 0.9)
+        LinearKeyframe(0, duration: 0.9, timingCurve: .easeInOut)
+    }
+    KeyframeTrack(\.lit) {
+        LinearKeyframe(0, duration: 1.3)
+        LinearKeyframe(1, duration: 0.25, timingCurve: .easeInOut)
+        LinearKeyframe(1, duration: 0.4)
+        LinearKeyframe(0, duration: 0.25, timingCurve: .easeInOut)
+        LinearKeyframe(0, duration: 0.9)
+    }
+}
+
 struct ReconnectAnimation: View {
+    static let timeline = KeyframeTimeline(initialValue: Plug(), content: plug)
+    var time: Double?
     let figure = Figure()
 
-    var body: some View {
-        KeyframeAnimator(initialValue: Plug(), repeating: true) { plug in
-            Canvas { context, size in
-                figure.draw(context, size: size, x: plug.x, lit: plug.lit)
-            }
-        } keyframes: { _ in
-            KeyframeTrack(\.x) {
-                LinearKeyframe(0, duration: 0.4)
-                LinearKeyframe(Figure.travel, duration: 0.9, timingCurve: .easeInOut)
-                LinearKeyframe(Figure.travel, duration: 0.9)
-                LinearKeyframe(0, duration: 0.9, timingCurve: .easeInOut)
-            }
-            KeyframeTrack(\.lit) {
-                LinearKeyframe(0, duration: 1.3)
-                LinearKeyframe(1, duration: 0.25, timingCurve: .easeInOut)
-                LinearKeyframe(1, duration: 0.4)
-                LinearKeyframe(0, duration: 0.25, timingCurve: .easeInOut)
-                LinearKeyframe(0, duration: 0.9)
-            }
+    func canvas(_ plug: Plug) -> some View {
+        Canvas { context, size in
+            figure.draw(context, size: size, x: plug.x, lit: plug.lit)
         }
-        .figureFade()
+    }
+
+    var body: some View {
+        if let time {
+            canvas(Self.timeline.value(time: time)).figureFade()
+        } else {
+            KeyframeAnimator(initialValue: Plug(), repeating: true, content: canvas) { _ in plug() }
+                .figureFade()
+        }
     }
 }
 
 struct Card: View {
+    var time: Double?
+
     var body: some View {
         VStack(spacing: 18) {
             if reconnect {
-                ReconnectAnimation()
+                ReconnectAnimation(time: time)
             } else {
-                TouchAnimation()
+                TouchAnimation(time: time)
             }
             Text(title)
                 .font(.system(size: 40, weight: .semibold))
@@ -438,6 +463,20 @@ struct Prompt: View {
         }
         .environment(\.colorScheme, .dark)
     }
+}
+
+// --frames writes one loop of the animation to stdout as PNGs at 25 fps.
+if frames {
+    MainActor.assumeIsolated {
+        let duration = reconnect ? ReconnectAnimation.timeline.duration : TouchAnimation.timeline.duration
+        for frame in 0..<Int((duration * 25).rounded()) {
+            let card = Card(time: Double(frame) / 25).padding(48).environment(\.colorScheme, .dark)
+            let renderer = ImageRenderer(content: card)
+            renderer.scale = 2
+            FileHandle.standardOutput.write(NSBitmapImageRep(cgImage: renderer.cgImage!).representation(using: .png, properties: [:])!)
+        }
+    }
+    exit(0)
 }
 
 let app = NSApplication.shared

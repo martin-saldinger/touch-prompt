@@ -42,7 +42,7 @@ Set these with `git config --global`, or without `--global` to apply them to one
 | `touch-prompt.attempts` | `4` | How many touches to wait for before the commit fails. |
 | `touch-prompt.keyName` | `YubiKey` | The key's name in the prompt, as in "Touch your YubiKey". |
 | `touch-prompt.sound` | `Glass` | A sound from `/System/Library/Sounds` without `.aiff`, a path to a sound file, or `off`. |
-| `touch-prompt.style` | `fullscreen` | `fullscreen` dims every screen behind the card. `card` shows the card without dimming. `hud` shows a small panel in the top-right corner. `menubar` shows a pulsing key in the menu bar. `none` plays only the sound. [Screenshots](docs/screenshots.md#styles). |
+| `touch-prompt.style` | `fullscreen` | `fullscreen` dims every screen behind the card. `card` shows the card without dimming. `hud` shows a small panel in the top-right corner. `none` plays only the sound. [Screenshots](docs/screenshots.md#styles). |
 
 For example, `git config --global touch-prompt.sound off` silences the prompt.
 

@@ -26,7 +26,8 @@ jobs:
           sample=$(mktemp -d)
           git -C "$sample" init -q
           git -C "$sample" -c user.name=sample -c user.email=sample@example.com commit -q --allow-empty -m "Add a preview mode to git-ssh-sign"
-          mkdir -p docs/screenshots
+          rm -rf docs/screenshots
+          mkdir docs/screenshots
           page=docs/screenshots.md
           shot() {
             git -C "$sample" config touch-prompt.style "$1"
@@ -37,8 +38,8 @@ jobs:
             shot card "$mode" "$mode"
             printf '\n### `--preview %s`\n\n![The %s prompt](screenshots/%s.png)\n' "$mode" "$mode" "$mode" >> "$page"
           done
-          printf '\n## Styles\n\nEach shows `--preview touch` with `touch-prompt.style` set. The `menubar` image is drawn for this page; the real one is a system menu bar item.\n' >> "$page"
-          for style in fullscreen card hud menubar; do
+          printf '\n## Styles\n\nEach shows `--preview touch` with `touch-prompt.style` set.\n' >> "$page"
+          for style in fullscreen card hud; do
             shot "$style" touch "style-$style"
             printf '\n### `%s`\n\n![The %s style](screenshots/style-%s.png)\n' "$style" "$style" "$style" >> "$page"
           done

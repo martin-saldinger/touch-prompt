@@ -8,7 +8,6 @@
 # or saves it as an animated PNG (needs ffmpeg). Settings are in the README.
 
 keygen=/opt/homebrew/bin/ssh-keygen
-# Verification and everything else go straight to ssh-keygen.
 [ "$1" = "-Y" ] && [ "$2" = "sign" ] || [ "$1" = "--preview" ] || exec "$keygen" "$@"
 
 # git prints its own error for an invalid value, then the default applies.

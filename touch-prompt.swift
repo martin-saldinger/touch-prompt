@@ -1,8 +1,7 @@
 import AppKit
 import SwiftUI
 
-// git-ssh-sign passes --key, --commit, --missed, --seconds, --reconnect, and --frames.
-// Empty values count as unset.
+// git-ssh-sign always passes --commit and --missed, empty when unset.
 var options: [String: String] = [:]
 var flags: Set<String> = []
 var rest = CommandLine.arguments.dropFirst()
@@ -477,7 +476,6 @@ struct Prompt: View {
     }
 }
 
-// --frames writes one loop of the animation to stdout as PNGs at 25 fps.
 if frames {
     MainActor.assumeIsolated {
         let duration = reconnect ? ReconnectAnimation.timeline.duration : TouchAnimation.timeline.duration

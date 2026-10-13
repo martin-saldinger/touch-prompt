@@ -33,6 +33,18 @@ Run `~/.local/bin/git-ssh-sign --preview` with `touch`, `missed`, or `reconnect`
 
 CI renders all three on every pull request and commits them to [docs/screenshots.md](docs/screenshots.md). The images above come from there.
 
+## Settings
+
+Set these with `git config --global`, or without `--global` to apply them to one repo only.
+
+| Key | Default | Values |
+|---|---|---|
+| `touch-prompt.attempts` | `4` | How many touches to wait for before the commit fails. |
+| `touch-prompt.keyName` | `YubiKey` | The key's name in the prompt, as in "Touch your YubiKey". |
+| `touch-prompt.sound` | `Glass` | A sound from `/System/Library/Sounds` without `.aiff`, a path to a sound file, or `off`. |
+
+For example, `git config --global touch-prompt.sound off` silences the prompt.
+
 ## Uninstall
 
 1. Run `git config --global gpg.ssh.program /opt/homebrew/bin/ssh-keygen`.

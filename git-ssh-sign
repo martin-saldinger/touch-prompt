@@ -1,62 +1,63 @@
 #!/bin/sh
-# git runs this as gpg.ssh.program. Signing with a FIDO key needs a touch,
-# so show a full-screen prompt while ssh-keygen waits and retry missed touches.
-# ssh-keygen reports "device not found" both when the key is unplugged and when
-# an interrupted signature left it stuck; replugging the key fixes both.
-# Run it with --preview [touch|missed|reconnect] to see a prompt without signing,
-# or add a file path to save it as an animated PNG instead (needs ffmpeg).
+# git runs this as gpg.ssh.program. Signing with a FIDO key needs a touch, so
+# show a prompt while ssh-keygen waits and retry missed touches. ssh-keygen
+# reports "device not found" both when the key is unplugged and when an
+# interrupted signature left it stuck; replugging the key fixes both.
+#
+# --preview [touch|missed|reconnect] [file.png] shows a prompt without signing,
+# or saves it as an animated PNG (needs ffmpeg). Settings are in the README.
 
 keygen=/opt/homebrew/bin/ssh-keygen
-prompt_bin="$(dirname "$0")/touch-prompt"
-sound=/System/Library/Sounds/Glass.aiff
-attempts=4
-nl='
-'
-waiting() { echo "git is waiting for a signature${summary:+$nl$summary}"; }
-missed() { echo "Missed it, try again ($1 of $attempts)${summary:+$nl$summary}"; }
+[ "$1" = "-Y" ] && [ "$2" = "sign" ] || [ "$1" = "--preview" ] || exec "$keygen" "$@"
+
+# git prints its own error for an invalid value, then the default applies.
+attempts=$(git config --type=int touch-prompt.attempts || echo 4)
+key=$(git config touch-prompt.keyName || echo YubiKey)
+sound=$(git config touch-prompt.sound || echo Glass)
+case $sound in */*) ;; off) sound= ;; *) sound=/System/Library/Sounds/$sound.aiff ;; esac
+
+# prompt execs, so $! is the prompt itself. Run it in the background, a
+# pipeline, a subshell, or last.
+prompt() { exec "$(dirname "$0")/touch-prompt" --key "$key" "$@"; }
+chime() { [ -n "$sound" ] && afplay "$sound" & }
 
 if [ "$1" = "--preview" ]; then
-  summary=$(git log -1 --format=%s 2>/dev/null)
   out=$3
+  summary=$(git log -1 --format=%s 2>/dev/null)
   case ${2:-touch} in
-    touch) set -- "Touch your YubiKey" "$(waiting)" 6 ;;
-    missed) set -- "Touch your YubiKey" "$(missed 2)" 6 ;;
-    reconnect) set -- "Reconnect your YubiKey" "Unplug it and plug it back in" 6 reconnect ;;
+    touch) set -- --commit "$summary" ;;
+    missed) set -- --commit "$summary" --missed "2 of $attempts" ;;
+    reconnect) set -- --reconnect ;;
     *) echo "usage: $0 --preview [touch|missed|reconnect] [file.png]" >&2; exit 2 ;;
   esac
-  if [ -n "$out" ]; then
-    "$prompt_bin" --frames "$@" | ffmpeg -v error -y -f png_pipe -framerate 25 -i - -plays 0 -f apng "$out"
-    exit
-  fi
-  afplay "$sound" &
-  exec "$prompt_bin" "$@"
+  [ -z "$out" ] && chime && prompt --seconds 6 "$@"
+  prompt --frames "$@" | ffmpeg -v error -y -f png_pipe -framerate 25 -i - -plays 0 -f apng "$out"
+  exit
 fi
-
-[ "$1" = "-Y" ] && [ "$2" = "sign" ] || exec "$keygen" "$@"
 
 err=$(mktemp)
 trap 'rm -f "$err"' EXIT
-trap 'kill "$prompt" 2>/dev/null; exit 1' INT TERM HUP
+trap 'kill "$pid" 2>/dev/null; exit 1' INT TERM HUP
+# The last argument is the file to sign. For a commit, show its subject.
 for buffer; do :; done
 summary=$(awk 'NR == 1 && !/^tree / { exit } !body && /^$/ { body = 1; next } body { print; exit }' "$buffer")
-subtitle=$(waiting)
+missed=
 attempt=1
 while :; do
-  afplay "$sound" &
-  "$prompt_bin" "Touch your YubiKey" "$subtitle" 60 &
-  prompt=$!
+  chime
+  prompt --commit "$summary" --missed "$missed" &
+  pid=$!
   "$keygen" "$@" 2>"$err"
   status=$?
-  kill "$prompt" 2>/dev/null
+  kill "$pid" 2>/dev/null
   cat "$err" >&2
   [ $status -eq 0 ] && exit 0
   [ $attempt -ge $attempts ] && exit $status
   attempt=$((attempt + 1))
+  missed="$attempt of $attempts"
   if grep -q "device not found" "$err"; then
-    afplay "$sound" &
-    "$prompt_bin" "Reconnect your YubiKey" "Unplug it and plug it back in" 10 reconnect
-    subtitle=$(waiting)
-  else
-    subtitle=$(missed $attempt)
+    chime
+    (prompt --reconnect --seconds 10)
+    missed=
   fi
 done

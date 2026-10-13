@@ -1,15 +1,26 @@
 import AppKit
 import SwiftUI
 
-var args = CommandLine.arguments
-let frames = args.count > 1 && args[1] == "--frames"
-if frames { args.remove(at: 1) }
-let title = args[1]
-let lines = args[2].split(separator: "\n", maxSplits: 1).map(String.init)
-let seconds = Double(args[3])!
-let reconnect = args.count > 4 && args[4] == "reconnect"
-let status = lines[0]
-let commit = lines.count > 1 ? lines[1] : nil
+// git-ssh-sign always passes --commit and --missed, empty when unset.
+var options: [String: String] = [:]
+var flags: Set<String> = []
+var rest = CommandLine.arguments.dropFirst()
+while let arg = rest.popFirst() {
+    if arg == "--reconnect" || arg == "--frames" {
+        flags.insert(arg)
+    } else if let value = rest.popFirst(), !value.isEmpty {
+        options[arg] = value
+    }
+}
+let reconnect = flags.contains("--reconnect")
+let frames = flags.contains("--frames")
+let seconds = options["--seconds"].flatMap(Double.init) ?? 60
+let key = options["--key", default: "YubiKey"]
+let commit = options["--commit"]
+let title = reconnect ? "Reconnect your \(key)" : "Touch your \(key)"
+let status = reconnect
+    ? "Unplug it and plug it back in"
+    : options["--missed"].map { "Missed it, try again (\($0))" } ?? "git is waiting for a signature"
 
 func hex(_ value: UInt32) -> Color {
     Color(red: Double(value >> 16 & 0xff) / 255, green: Double(value >> 8 & 0xff) / 255, blue: Double(value & 0xff) / 255)
@@ -465,7 +476,6 @@ struct Prompt: View {
     }
 }
 
-// --frames writes one loop of the animation to stdout as PNGs at 25 fps.
 if frames {
     MainActor.assumeIsolated {
         let duration = reconnect ? ReconnectAnimation.timeline.duration : TouchAnimation.timeline.duration
